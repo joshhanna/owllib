@@ -73,13 +73,9 @@ class Ontology:
         for imp in self.direct_imports:
             self.sync_entity_to_graph(imp)
 
-
     def sync_from_graph(self):
 
-        uris = [uri for uri in self.graph.subjects(RDF.type, OWL.Ontology)]
-
-        if len(uris) > 0:
-            self.uri = uris[0]
+        self.uri = self._load_uri()
 
         self.direct_imports = self._load_directs()
         self._consolidate_imports()
@@ -92,24 +88,25 @@ class Ontology:
         self.annotation_properties = self._load_object_properties()
         self.data_properties = self._load_data_properties()
 
+    #inefficient, since it loads then discards ontologies
     def _consolidate_imports(self, imports=None):
-        #TODO make not broken
 
         if imports and len(self.direct_imports) > 0:
             new_imports = set()
 
             for imp in imports:
                 for direct_import in self.direct_imports:
-                    if direct_import.uri == imp.uri:
-                        print("updating item")
+                    if direct_import.uri == imp.uri and direct_import != imp:
                         new_imports.add(imp)
-                    else:
-                        print("not updating item")
+                    elif direct_import.uri == imp.uri:
                         new_imports.add(direct_import)
 
-            print(new_imports, self.direct_imports)
-            if new_imports == self.direct_imports:
-                print("updating list")
+            #adding back direct imports that had no analog
+            uris = [ont.uri for ont in new_imports]
+
+            for imp in self.direct_imports:
+                if imp.uri not in uris:
+                    new_imports.add(imp)
 
             self.direct_imports = new_imports
 
@@ -162,6 +159,24 @@ class Ontology:
 
             #looks like none of them worked
             raise rdflib.plugin.PluginException("No parser plugin found for ontology.")
+
+    def _load_uri(self):
+        uris = [uri for uri in self.graph.subjects(RDF.type, OWL.Ontology)]
+
+        #more than one ontology in the file; choosing one with most triples as canonical
+        if len(uris) > 1:
+            canon_uri = uris[0]
+            canon_num = 0
+            for uri in uris:
+                tuples = [(pred, obj) for (pred, obj) in self.graph.predicate_objects(uri)]
+                num = len(tuples)
+
+                if num > canon_num:
+                    canon_num = num
+                    canon_uri = uri
+
+        elif len(uris) > 0:
+            return uris[0]
 
     def _load_indirects(self):
         indirects = set()
@@ -265,6 +280,8 @@ class Ontology:
         if isinstance(entity, Literal):
             return entity
         if isinstance(entity, DataProperty):
+            return entity
+        if isinstance(entity, Ontology):
             return entity
 
         #return rdflib Literal as-is
