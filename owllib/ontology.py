@@ -37,19 +37,14 @@ class Ontology:
         self.annotation_properties = set()
         self.data_properties = set()
 
-    def sync_entity_from_graph(self, entity):
-        entity = self.convert(entity)
+    #read-only properties
+    @property
+    def entities(self):
+        return self.classes | self.individuals | self.properties
 
-        if isinstance(entity, Class):
-            return Class(uri=entity, ontology=self)
-        if isinstance(entity, Individual):
-            return Individual(uri=entity, ontology=self)
-        if isinstance(entity, ObjectProperty):
-            return ObjectProperty(uri=entity, ontology=self)
-        if isinstance(entity, AnnotationProperty):
-            return AnnotationProperty(uri=entity, ontology=self)
-        if isinstance(entity, DataProperty):
-            return DataProperty(uri=entity, ontology=self)
+    @property
+    def properties(self):
+        return self.object_properties | self.annotation_properties | self.data_properties
 
     def sync_entity_to_graph(self, entity):
         """
@@ -87,6 +82,9 @@ class Ontology:
         self.object_properties = self._load_object_properties()
         self.annotation_properties = self._load_object_properties()
         self.data_properties = self._load_data_properties()
+
+        for entity in self.entities:
+            entity.sync_from_ontology()
 
     #inefficient, since it loads then discards ontologies
     def _consolidate_imports(self, imports=None):
@@ -174,6 +172,7 @@ class Ontology:
                 if num > canon_num:
                     canon_num = num
                     canon_uri = uri
+            return canon_uri
 
         elif len(uris) > 0:
             return uris[0]
@@ -209,7 +208,6 @@ class Ontology:
         return entities
 
     def _load_individuals(self):
-        #getting everything explicitly typed as a NamedIndividual
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.NamedIndividual)]
 
         entities = set()
@@ -358,4 +356,48 @@ class Ontology:
 
         return set(definitions)
 
+    def get_triples(self, entity):
+        entity = self.convert(entity)
 
+        return set(self.graph.triples((entity.uri, None, None))) | set(self.graph.triples((None, entity.uri, None))) | set(self.graph.triples((None, None, entity.uri)))
+
+    def get_super_classes(self, cls):
+        cls = self.convert(cls)
+        parent_uris = set(self.graph.objects(cls.uri, RDFS.subClassOf))
+
+        parents = [acls for acls in self.classes if acls.uri in parent_uris]
+
+        return set(parents)
+
+    def get_sub_classes(self, cls):
+        cls = self.convert(cls)
+        children_uris = set(self.graph.subjects(RDFS.subClassOf, cls.uri))
+
+        children = [acls for acls in self.classes if acls.uri in children_uris]
+
+        return set(children)
+
+    def get_individual_type(self, indiv):
+        indiv = self.convert(indiv)
+
+        type_uris = set(self.graph.objects(indiv.uri, RDF.type))
+
+        types = [cls for cls in self.classes if cls.uri in type_uris]
+
+        return set(types)
+
+    def get_super_properties(self, prop):
+        prop = self.convert(prop)
+        parent_uris = set(self.graph.objects(prop.uri, RDFS.subPropertyOf))
+
+        parents = [aprop for aprop in self.properties if aprop.uri in parent_uris]
+
+        return set(parents)
+
+    def get_sub_properties(self, prop):
+        prop = self.convert(prop)
+        children_uris = set(self.graph.objects(RDFS.subPropertyOf, prop.uri))
+
+        children = [aprop for aprop in self.properties if aprop.uri in children_uris]
+
+        return set(children)
