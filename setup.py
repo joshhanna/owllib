@@ -16,7 +16,7 @@ setup(
     # http://packaging.python.org/en/latest/tutorial.html#version
     version='0.1.0',
 
-    description='A sample Python project',
+    description='A OWL API built using RDFLib to simplify working with OWL constructs',
     long_description=long_description,
 
     # The project's main homepage.
