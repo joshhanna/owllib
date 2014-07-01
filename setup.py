@@ -38,8 +38,12 @@ setup(
         'Development Status :: 3 - Alpha',
 
         # Indicate who your project is intended for
+	'Intended Audience :: Science/Research',
         'Intended Audience :: Developers',
-        'Topic :: Ontology Development :: OWL2',
+	'Topic :: Scientific/Engineering :: Artificial Intelligence',
+	'Topic :: Scientific/Engineering :: Bio-Informatics',
+	'Topic :: Scientific/Engineering :: Information Analysis',
+	'Topic :: Scientific/Engineering :: Mathematics',
 
         # Pick your license as you wish (should match "license" above)
         'License :: OSI Approved :: MIT License',

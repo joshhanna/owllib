@@ -3,6 +3,8 @@ __author__ = 'joshhanna'
 from owllib.ontology import Ontology
 from rdflib import URIRef
 
+#TODO: convert to actual tests
+
 ont = Ontology()
 print("loading bfo")
 ont.load(location="http://www.ifomis.org/bfo/owl")
