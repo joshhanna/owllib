@@ -15,21 +15,23 @@ class Entity:
             self.comments = self.ontology.get_comments(self)
             self.definitions = self.ontology.get_definitions(self)
         else:
-            self.annotations = []
+            self.annotations = set()
             if labels:
                 self.labels = labels
             else:
-                self.labels = []
+                self.labels = set()
 
             if comments:
                 self.comments = comments
             else:
-                self.comments = []
+                self.comments = set()
 
             if definitions:
                 self.definitions = definitions
             else:
-                self.definitions = []
+                self.definitions = set()
+
+            self.triples = set()
 
 
 class Class(Entity):
@@ -55,21 +57,3 @@ class DataProperty(Property):
 class AnnotationProperty(Property):
     def __init__(self, uri=None, ontology=None, labels=None, comments=None):
         super(AnnotationProperty, self).__init__(uri, ontology, labels, comments)
-
-
-class Annotation:
-    """
-    Doesn't reflect an 'official' owl construct, but still useful.  A class that contains both the annotation property
-    and the annotation value (a literal, class, individual, etc)
-    """
-    def __init__(self, source, prop, target):
-        self.property = prop
-        self.source = source
-        self.target = target
-
-
-class Data:
-    """
-    Also does not reflect an official construct, but instead contains the data property and actual literal data together.
-    """
-    pass
