@@ -25,3 +25,7 @@ for cls in ont.classes:
         print("cls:", cls.uri)
         for s, p, o in cls.triples:
             print(s, p, o)
+
+print("loading dron")
+ont.load(location="http://purl.obolibrary.org/obo/dron.owl")
+print("dron loaded")

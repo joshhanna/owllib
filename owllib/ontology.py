@@ -10,8 +10,17 @@ class Ontology:
     """
 
     def __init__(self, uri=None, version_uri=None, imports=None):
+        """
+        creates a new ontology; to load, use the Ontology.load method
+        :param uri:
+        :param version_uri:
+        :param imports:
+        :return:
+        """
+
         self.graph = Graph()
 
+        #if we have no uri, we create a bnode
         if not uri:
             self.uri = BNode()
 
@@ -48,13 +57,27 @@ class Ontology:
 
     def sync_entity_to_graph(self, entity):
         """
-        TODO
+        removes all triples of the entity, then replaces them with the triples found in the entity instance
         :param entity:
         :return:
         """
-        pass
+        #removing all existing triples for this entity
+        to_remove = self.get_triples(entity)
+
+        for triple in to_remove:
+            self.graph.remove(triple)
+
+        #adding triples from entity to graph
+        to_add = entity.triples
+
+        for triple in to_add:
+            self.graph.add(triple)
 
     def sync_to_graph(self):
+        """
+        syncs all entities to the graph
+        :return:
+        """
         for cls in self.classes:
             self.sync_entity_to_graph(cls)
         for indiv in self.individuals:
@@ -69,7 +92,10 @@ class Ontology:
             self.sync_entity_to_graph(imp)
 
     def sync_from_graph(self):
-
+        """
+        syncs all entities from the graph
+        :return:
+        """
         self.uri = self._load_uri()
 
         self.direct_imports = self._load_directs()
@@ -83,12 +109,18 @@ class Ontology:
         self.annotation_properties = self._load_object_properties()
         self.data_properties = self._load_data_properties()
 
+        #TODO very slow for large ontologies; find more efficient way
+        #was required because getting sub and super entities did not work without all of them already loaded
         for entity in self.entities:
             entity.sync_from_ontology()
 
     #inefficient, since it loads then discards ontologies
     def _consolidate_imports(self, imports=None):
-
+        """
+        recursively consolidates the imported ontologies such that there is only one of each ontology that shares a uri
+        :param imports:
+        :return:
+        """
         if imports and len(self.direct_imports) > 0:
             new_imports = set()
 
@@ -108,6 +140,7 @@ class Ontology:
 
             self.direct_imports = new_imports
 
+            #using a 'non-public' call, but it's in this file so I figure it's not too destructive
             imp._consolidate_imports(self.direct_imports | imports)
         else:
             for imp in self.direct_imports:
@@ -115,6 +148,17 @@ class Ontology:
 
     def load(self, source=None, publicID=None, format=None,
              location=None, file=None, data=None, **args):
+        """
+        loads the ontology into the graph.  params are identical to rdflib.Graph.parse
+        :param source:
+        :param publicID:
+        :param format:
+        :param location:
+        :param file:
+        :param data:
+        :param args:
+        :return:
+        """
 
         self.graph = Graph()
 
@@ -124,6 +168,17 @@ class Ontology:
 
     def _parse(self, source=None, publicID=None, format=None,
                location=None, file=None, data=None, **args):
+        """
+        parses the ontology using rdflib.Graph.parse().  First, uses rdflib's guess_format, then tries all of them
+        :param source:
+        :param publicID:
+        :param format:
+        :param location:
+        :param file:
+        :param data:
+        :param args:
+        :return:
+        """
 
         #first, try rdflib's guess_format
         if location and not format:
@@ -159,6 +214,10 @@ class Ontology:
             raise rdflib.plugin.PluginException("No parser plugin found for ontology.")
 
     def _load_uri(self):
+        """
+        loads the ontology uri from the graph; chooses the one with the most triples if there are multiples
+        :return:
+        """
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.Ontology)]
 
         #more than one ontology in the file; choosing one with most triples as canonical
@@ -178,6 +237,10 @@ class Ontology:
             return uris[0]
 
     def _load_indirects(self):
+        """
+        recursively loads all of the imports of any of the direct imports
+        :return:
+        """
         indirects = set()
 
         for ont in self.direct_imports:
@@ -186,6 +249,10 @@ class Ontology:
         return indirects
 
     def _load_directs(self):
+        """
+        loads all of the direct imports, creating ontologies for each of them
+        :return:
+        """
         uris = [o for o in self.graph.objects(self.uri, OWL.imports)]
 
         entities = set()
@@ -198,7 +265,12 @@ class Ontology:
         return entities
 
     def _load_classes(self):
-        uris = [uri for uri in self.graph.subjects(RDF.type, OWL.Class)]
+        """
+        loads all of the classes in the graph into owllib entities
+        :return:
+        """
+        uris = set(uri for uri in self.graph.subjects(RDF.type, OWL.Class)) \
+               | set(uri for uri in self.graph.subjects(RDF.type, OWL.Restriction))
 
         entities = set()
 
@@ -208,6 +280,10 @@ class Ontology:
         return entities
 
     def _load_individuals(self):
+        """
+        loads all of the individuals in the graph into owllib entities
+        :return:
+        """
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.NamedIndividual)]
 
         entities = set()
@@ -218,6 +294,10 @@ class Ontology:
         return entities
 
     def _load_object_properties(self):
+        """
+        loads all of the object properties in the graph into owllib entities
+        :return:
+        """
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.ObjectProperty)]
 
         entities = set()
@@ -228,6 +308,10 @@ class Ontology:
         return entities
 
     def _load_annotation_properties(self):
+        """
+        loads all of the annotation properties in the graph into owllib entities
+        :return:
+        """
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.AnnotationProperty)]
 
         entities = set()
@@ -238,6 +322,10 @@ class Ontology:
         return entities
 
     def _load_data_properties(self):
+        """
+        loads all of the data properties int he graph into owllib entities
+        :return:
+        """
         uris = [uri for uri in self.graph.subjects(RDF.type, OWL.DatatypeProperty)]
 
         entities = set()
@@ -248,6 +336,11 @@ class Ontology:
         return entities
 
     def exists(self, uri):
+        """
+        checks to see if the uri exists in the graph
+        :param uri:
+        :return:
+        """
         graph = self.graph
 
         uris = set(graph.subjects()).union(graph.predicates()).union(graph.objects())
@@ -315,6 +408,11 @@ class Ontology:
         raise TypeError("Type could not be converted properly.  Found " + type(entity).__name__)
 
     def get_annotations(self, entity):
+        """
+        returns all annotations as tuples for the passed in entity
+        :param entity:
+        :return:
+        """
 
         #if it's a URIRef or similar, convert it to owllib representation
         entity = self.convert(entity)
@@ -330,6 +428,11 @@ class Ontology:
         return annotations
 
     def get_labels(self, entity):
+        """
+        returns all rdfs:labels for the passed in entity
+        :param entity:
+        :return:
+        """
 
         #if it's a URIRef or similar, convert it to owllib representation
         entity = self.convert(entity)
@@ -339,6 +442,11 @@ class Ontology:
         return set(labels)
 
     def get_comments(self, entity):
+        """
+        returns all of the rdfs:comments for the passed in entity
+        :param entity:
+        :return:
+        """
 
         #if it's a URIRef or similar, convert it to owllib representation
         entity = self.convert(entity)
@@ -348,6 +456,11 @@ class Ontology:
         return set(comments)
 
     def get_definitions(self, entity):
+        """
+        returns all of the IAO definitions of the passed in entity
+        :param entity:
+        :return:
+        """
 
         #if it's a URIRef or similar, convert it to owllib representation
         entity = self.convert(entity)
@@ -357,11 +470,21 @@ class Ontology:
         return set(definitions)
 
     def get_triples(self, entity):
+        """
+        returns all of the triples for the passed in entity where the entity was a subject, object, or predicate
+        :param entity:
+        :return:
+        """
         entity = self.convert(entity)
 
         return set(self.graph.triples((entity.uri, None, None))) | set(self.graph.triples((None, entity.uri, None))) | set(self.graph.triples((None, None, entity.uri)))
 
     def get_super_classes(self, cls):
+        """
+        returns all of the super classes of :param cls
+        :param cls:
+        :return:
+        """
         cls = self.convert(cls)
         parent_uris = set(self.graph.objects(cls.uri, RDFS.subClassOf))
 
@@ -370,6 +493,11 @@ class Ontology:
         return set(parents)
 
     def get_sub_classes(self, cls):
+        """
+        returns all fo the sub classes of :param cls
+        :param cls:
+        :return:
+        """
         cls = self.convert(cls)
         children_uris = set(self.graph.subjects(RDFS.subClassOf, cls.uri))
 
@@ -378,6 +506,11 @@ class Ontology:
         return set(children)
 
     def get_individual_type(self, indiv):
+        """
+        returns the type of :param indiv
+        :param indiv:
+        :return:
+        """
         indiv = self.convert(indiv)
 
         type_uris = set(self.graph.objects(indiv.uri, RDF.type))
@@ -387,6 +520,11 @@ class Ontology:
         return set(types)
 
     def get_super_properties(self, prop):
+        """
+        returns all of the super properties of :param prop
+        :param prop:
+        :return:
+        """
         prop = self.convert(prop)
         parent_uris = set(self.graph.objects(prop.uri, RDFS.subPropertyOf))
 
@@ -395,6 +533,11 @@ class Ontology:
         return set(parents)
 
     def get_sub_properties(self, prop):
+        """
+        returns all of the sub properties of :param prop
+        :param prop:
+        :return:
+        """
         prop = self.convert(prop)
         children_uris = set(self.graph.objects(RDFS.subPropertyOf, prop.uri))
 
